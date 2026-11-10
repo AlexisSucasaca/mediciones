@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mediciones"
+version = "1.0.0"
+description = "Mediciones de brechas (CPB, CPM, Champion, Impulso): cierre mensual con lo reportado fijo y publicación incremental en BigQuery"
+requires-python = ">=3.10"
+dependencies = [
+  "pandas", "numpy", "scipy", "scikit-learn", "statsmodels", "joblib", "tqdm", "matplotlib", "seaborn",
+  "openpyxl", "xlsxwriter", "pyarrow", "pyyaml", "pandas-gbq", "google-cloud-bigquery", "db-dtypes",
+  "nbformat", "nbclient", "ipykernel",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pyflakes", "sqlglot"]
+
+[project.scripts]
+mediciones = "mediciones.runner:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["lento: prueba de punta a punta con datos sintéticos (~2 min)", "referencias: requiere salidas reales en referencias/"]

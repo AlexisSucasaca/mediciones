@@ -1,0 +1,69 @@
+# Registro de familias y programas (los 4 que se publican en BigQuery: cpb, cpm, surtido_motor, champion_motor). Lo propio de cada programa (SQL, universo, categorías, MIN_MESES, overrides) vive en
+# src/mediciones/programas/<script>.py, en el bloque de configuración al inicio de cada script.
+version: 1
+
+familias:
+  mensual:                       # evaluación por mes calendario, YoY, pares fijos (CPB, CPM)
+    scripts: [metodologia, qa, exportar]
+    variable_mes: FECHA_FIN_ACTUAL_OVERRIDE
+    estado_yoy: estandar         # normalizacion.py asigna antiguo/nuevo y atribuye todo a los nuevos (ant == 0)
+    regla_nuevo: sin_compra_mes_anterior   # metodologia/atribucion.py: nuevo = toneladas_ant == 0 -> atribuible = todo
+    salida_ton: base_calculo_toneladas
+    salida_brecha: base_calculo_brecha
+    salida_esp: base_calculo_espejos
+  champion:                      # una cosecha ancla con altas acumulativas, por mes de exposición, ANCOVA (Champion Minimayorista): portada literal de su notebook
+    scripts: [salida, ../cosechas/exportar]
+    variable_mes: MES_CIERRE_OVERRIDE
+    estado_yoy: programa         # se respeta el estado y el atribuible que calcula el notebook
+    salida_ton: base_calculo_toneladas
+    salida_brecha: base_calculo_brecha
+    salida_esp: base_calculo_espejos
+  cosechas:                      # evaluación por cosecha, mes relativo, estado congelado (surtido, Champion)
+    scripts: [metodologia, exportar]
+    variable_mes: MES_CIERRE_OVERRIDE
+    estado_yoy: programa         # se respeta el estado y el atribuible del programa: no_existia_periodo_pasado = todo; reactivado = 0
+    regla_nuevo: cliente_creado            # metodologia/atribucion.py: no existía (cliente creado después del mes comparado) = todo; reactivado = 0
+    salida_ton: base_calculo_toneladas
+    salida_brecha: base_calculo_brecha
+    salida_esp: base_calculo_espejos
+
+programas:
+  cpb:
+    familia: mensual
+    motor: familia               # se ejecuta en proceso con la metodología de la familia
+    script: cpb
+    negocios_ub: [CP1]
+    metodo_ub: notebook          # UB base por tonelada, como el notebook de CPB/CPM (ver ub.py). Surtido y Champion usan el mismo método
+    pares: {tipo: mensual, ruta: "{programa}_pares_fijos.csv"}       # estado local de pares; BigQuery (base_espejos) es la fuente de verdad
+  cpm:
+    familia: mensual
+    motor: familia
+    script: cpm
+    negocios_ub: [CP1]
+    metodo_ub: notebook
+    pares: {tipo: mensual, ruta: "{programa}_pares_fijos.csv"}
+
+  surtido_motor:
+    familia: cosechas
+    motor: familia
+    script: surtido
+    pares: {tipo: cosechas, ruta: "outputs/Surtido Ideal - Medición/df_matches.csv"}
+    metodo_ub: notebook          # mismo cálculo de UB que CPB/CPM (su notebook no tenía UB; la línea base de setiembre se completa con completar_ub_linea_base)
+    # Lo provisional es SOLO el G04 (cosecha dic): se republica completo en cada cierre desde octubre hasta febrero 2027, cuando su retroactivo
+    # (oct-nov, referencia dic-feb) queda final. Las demás cosechas se publican una vez y quedan fijas. Ver LEEME.md.
+    provisional_desde: "2026-10-01"
+    provisional_cosechas: ["2026-12-01"]
+    provisional_hasta: "2027-02-01"
+    calendario_cosechas:             # una sola fuente para los grupos (mediciones/calendario.py): altas, cosecha agrupada y etapa preliminar
+      - {grupo: G01, nombre: "GRUPO 01 (Feb-Abr)", altas_desde: "2026-02-01", altas_hasta: "2026-04-01", cosecha: "2026-04-01"}
+      - {grupo: G02, nombre: "GRUPO 02 (May-Jun)", altas_desde: "2026-05-01", altas_hasta: "2026-06-01", cosecha: "2026-06-01"}
+      - {grupo: G03, nombre: "GRUPO 03 (Jul-Ago)", altas_desde: "2026-07-01", altas_hasta: "2026-09-01", cosecha: "2026-08-01"}    # altas hasta setiembre; rótulo como se reportó
+      - {grupo: G04, nombre: "GRUPO 04 (Oct-Dic)", altas_desde: "2026-10-01", altas_hasta: "2026-12-01", cosecha: "2026-12-01", preliminar: true}
+    nota: "Impulso. Estado congelado en outputs/ (no borrar). Controles congelados conservan su serie (territorio, compañía, bodega). Ver LEEME.md."
+  champion_motor:
+    familia: champion
+    motor: familia
+    script: champion
+    pares: {tipo: cosechas, ruta: "outputs/Champion Minimayorista - Medición/df_matches.csv"}
+    metodo_ub: notebook          # mismo cálculo de UB que CPB/CPM (ver surtido_motor)
+    nota: "Champion Minimayorista. Pares congelados en outputs/ (df_matches.csv + meta_pares_congelados.json). Cambios de código: equivalencias_codigos.csv. Ver LEEME.md."
